@@ -51,10 +51,20 @@ public class Iperfer {
 			System.exit(-1);
 		}
 		String sName = args[2];
+		InetAddress sip = null;
+		try{
+		    sip = InetAddress.getByName(sName);
+		}catch (UnknownHostException e){
+		    //do nothing
+		}
 		Socket client = null;
 		OutputStream toServer = null;
 		try{
+		    if(sip != null){
+			client = new Socket(sip, port);
+		    }else{
 			client = new Socket(sName, port);
+		    }
 			toServer = client.getOutputStream();
 		}catch(IOException e){
 			e.printStackTrace();
@@ -62,16 +72,34 @@ public class Iperfer {
 		}
 		DataOutputStream out = new DataOutputStream(toServer);
 		byte[] b = new byte[1000];
+		long count = 0;
 		long startTime = System.currentTimeMillis();
-		while(System.currentTimeMillis() - startTime < time * 1000){
+		//System.out.println("time limit " + time*1000);
+		while(System.currentTimeMillis() - startTime < time){
+		//	System.out.println("duration = " + (System.currentTimeMillis()-startTime));
 			try {
 				out.write(b);
+				count++;
 			}catch (IOException e) {		
 				e.printStackTrace();
 				System.exit(-1);
 			}
 		}
+		try {
+			client.close();
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.out.println("closing err");
+			System.exit(-1);
+		}
+		double rate = 0.0;
+		if(time != 0){
+			rate = count*1000*8*1.0/time*1000;
+		}
 		//summary of sending
+		System.out.println("receive=" + count +" KB " + "rate=" + rate + " Mbps"); 
 	}
 	
 	//server mode
@@ -91,6 +119,35 @@ public class Iperfer {
 		}catch(NumberFormatException e){
 			System.out.println("Error: number format");
 			System.exit(-1);
+		}
+		ServerSocket server;
+		Socket connection;
+		try {
+			server = new ServerSocket(port);
+			server.setSoTimeout(0); //infinte timeout
+			connection = server.accept();
+			DataInputStream in = new DataInputStream(connection.getInputStream());
+			byte[] buffer = new byte[10000];
+			int count = 0;
+			long sum = 0;
+			long startTime = System.currentTimeMillis();
+			while((count = in.read(buffer)) != -1){
+				sum += count;
+			}
+			long endTime = System.currentTimeMillis();
+			long duration = endTime - startTime;
+			in.close();
+			server.close();
+			connection.close();
+			double rate = 0; 
+			if(sum > 0){	
+				rate = sum*8*1.0/duration*1000;
+			}
+			System.out.println("received=" + sum/1000 + " KB " + "rate=" + rate + " Mbps");
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		//while connection not closed by client
 	}
